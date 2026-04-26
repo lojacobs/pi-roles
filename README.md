@@ -305,7 +305,7 @@ Project settings beat global settings, per Pi's standard precedence.
 
 These are decided, not configurable, so the extension behaves predictably:
 
-- **Markdown body is appended to Pi's `before_agent_start` system-prompt chain.** This means the role body composes with whatever prompt the upstream chain produced (Pi default + any other extensions), with the role body last and therefore most influential. If you need the role body to fully replace upstream framing, write the body to begin with explicit overriding instructions ("Ignore any previous coding-assistant framing; you are X.").
+- **Markdown body fully replaces Pi's default system prompt.** No silent merging — most non-coding roles are polluted by the default "expert coding assistant" framing, so by design the role body is authoritative. The handler returns `{ systemPrompt: <role body> }` from `before_agent_start` and ignores the upstream chain value. If you want to keep Pi's default content (or compose with another extension), include the relevant text in your role body explicitly.
 - **Role inheritance**: `model`/`thinking` override; `tools` is tri-state (set/empty/absent); markdown body is **prepended**.
 - **Cycle detection in `extends`** is a hard error at load time, not a warning. A circular role is broken; refusing to load it is the only sane behavior.
 - **`/role <name>` always re-reads from disk.** No staleness between switches, ever.

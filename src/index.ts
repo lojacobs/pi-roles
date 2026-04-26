@@ -129,22 +129,19 @@ export default function (pi: ExtensionAPI): void {
   });
 
   // ----------------------------------------------------------- before_agent_start
-  // Pi composes the system prompt every turn and chains extension overrides.
-  // We always start from the chain's current value (event.systemPrompt) and
-  // append our role body, so other extensions can still contribute.
-  pi.on("before_agent_start", async (event) => {
-    if (!state.activeRole) return;
-    const base = event.systemPrompt ?? "";
-    const body = state.activeRole.body;
-    const mode = effectiveIntercomMode(state.activeRole, state.settings.intercomMode);
-    const addendum =
-      mode !== "off" && isIntercomAvailable(pi)
-        ? intercomPromptAddendum(mode, pi.getSessionName())
-        : "";
-    const parts = [base, body, addendum].filter((p) => p && p.length > 0);
-    if (parts.length === 0) return;
-    return { systemPrompt: parts.join("\n\n") };
-  });
+  // Full replacement: the role body IS the system prompt for this turn.
+  //
+  // We intentionally ignore `event.systemPrompt` (Pi's default coding-assistant
+  // framing plus anything earlier extensions in the chain produced). The
+  // founding goal of pi-roles is to make the role body authoritative — a
+  // non-coding role (marketing, research, ops) must not inherit the default
+  // "expert coding assistant" voice or it stops behaving like its description.
+  //
+  // Pi's docstring on BeforeAgentStartEventResult.systemPrompt says exactly
+  // "Replace the system prompt for this turn"; that is what we do.
+  // Subsequent extensions in the chain see our value as their
+  // event.systemPrompt and may compose if they choose.
+  pi.on("before_agent_start", async () => composeSystemPrompt(state, pi));
 
   // ---------------------------------------------------------------- /role
   pi.registerCommand("role", {
@@ -194,6 +191,33 @@ export default function (pi: ExtensionAPI): void {
 // ---------------------------------------------------------------------------
 // Role-name resolution
 // ---------------------------------------------------------------------------
+
+/**
+ * Build the replacement system prompt for the current active role.
+ *
+ * Returns `undefined` when there's no active role (Pi keeps its default for
+ * that turn). Otherwise returns `{ systemPrompt }` with the role body — and,
+ * when intercom is requested AND the intercom tool is registered, a small
+ * mode-specific addendum appended to the body.
+ *
+ * Exported for unit tests; the handler in `before_agent_start` is a one-line
+ * delegation.
+ */
+export function composeSystemPrompt(
+  state: Pick<RuntimeState, "activeRole" | "settings">,
+  pi: Pick<ExtensionAPI, "getAllTools" | "getSessionName">,
+): { systemPrompt: string } | undefined {
+  if (!state.activeRole) return undefined;
+  const body = state.activeRole.body;
+  const mode = effectiveIntercomMode(state.activeRole, state.settings.intercomMode);
+  const addendum =
+    mode !== "off" && isIntercomAvailable(pi as ExtensionAPI)
+      ? intercomPromptAddendum(mode, pi.getSessionName())
+      : "";
+  const parts = [body, addendum].filter((p) => p.length > 0);
+  if (parts.length === 0) return undefined;
+  return { systemPrompt: parts.join("\n\n") };
+}
 
 /**
  * Pick the role to launch with on a fresh session_start (no pendingReset, no

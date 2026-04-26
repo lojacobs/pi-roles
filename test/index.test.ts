@@ -8,10 +8,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { pickInitialRoleName, roleCompletions } from "../src/index.ts";
-import { parseRoleSource } from "../src/roles.ts";
+import { composeSystemPrompt, pickInitialRoleName, roleCompletions } from "../src/index.ts";
+import { parseRoleSource, resolveRole } from "../src/roles.ts";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import type { PiRolesSettings, RawRole } from "../src/schemas.ts";
+import type { PiRolesSettings, RawRole, ResolvedRole } from "../src/schemas.ts";
+import { INTERCOM_TOOL_NAME } from "../src/intercom.ts";
 
 function makePi(flags: Record<string, string | boolean | undefined> = {}): ExtensionAPI {
   return {
@@ -140,5 +141,70 @@ describe("roleCompletions", () => {
       label: expect.any(String),
       description: expect.any(String),
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// composeSystemPrompt — replacement contract
+// ---------------------------------------------------------------------------
+
+describe("composeSystemPrompt", () => {
+  function resolveSingle(name: string, body: string, intercom?: string): ResolvedRole {
+    const fm = `---\nname: ${name}\ndescription: x${intercom ? `\nintercom: ${intercom}` : ""}\n---\n${body}`;
+    return resolveRole(name, [parseRoleSource(fm, `/v/${name}.md`, "project")]);
+  }
+
+  function piWith(toolNames: string[], sessionName?: string): ExtensionAPI {
+    return {
+      getAllTools: () => toolNames.map((name) => ({ name, description: "", parameters: {} as any, sourceInfo: {} as any })),
+      getSessionName: () => sessionName,
+    } as unknown as ExtensionAPI;
+  }
+
+  it("returns undefined when no active role", () => {
+    expect(composeSystemPrompt({ activeRole: null, settings: {} }, piWith([]))).toBeUndefined();
+  });
+
+  it("returns role body verbatim, ignoring any upstream system prompt", () => {
+    const role = resolveSingle("architect", "You are an architect. Design only.");
+    const result = composeSystemPrompt({ activeRole: role, settings: {} }, piWith([]));
+    expect(result).toEqual({ systemPrompt: "You are an architect. Design only." });
+    // The critical assertion: we didn't compose with Pi's default. There is
+    // no path in this function that reads upstream prompt content.
+    expect(result?.systemPrompt).not.toMatch(/coding assistant/);
+  });
+
+  it("appends intercom addendum when mode!=off and intercom tool is registered", () => {
+    const role = resolveSingle("architect", "Body.", "send");
+    const result = composeSystemPrompt(
+      { activeRole: role, settings: {} },
+      piWith([INTERCOM_TOOL_NAME], "architect"),
+    );
+    expect(result?.systemPrompt).toMatch(/^Body\.\n\n## intercom/);
+    expect(result?.systemPrompt).toContain("architect");
+  });
+
+  it("omits addendum when intercom tool is not registered", () => {
+    const role = resolveSingle("architect", "Body.", "send");
+    const result = composeSystemPrompt({ activeRole: role, settings: {} }, piWith([]));
+    expect(result).toEqual({ systemPrompt: "Body." });
+  });
+
+  it("omits addendum when intercom mode resolves to off", () => {
+    const role = resolveSingle("architect", "Body.");
+    const result = composeSystemPrompt(
+      { activeRole: role, settings: { intercomMode: "off" } },
+      piWith([INTERCOM_TOOL_NAME]),
+    );
+    expect(result).toEqual({ systemPrompt: "Body." });
+  });
+
+  it("global settings.intercomMode applies when role doesn't override", () => {
+    const role = resolveSingle("architect", "Body.");
+    const result = composeSystemPrompt(
+      { activeRole: role, settings: { intercomMode: "both" } },
+      piWith([INTERCOM_TOOL_NAME], "architect"),
+    );
+    expect(result?.systemPrompt).toMatch(/intercom \(both modes\)/);
   });
 });
