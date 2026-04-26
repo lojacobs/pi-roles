@@ -46,8 +46,10 @@ interface RuntimeState {
   activeRole: ResolvedRole | null;
   /** Set by `/role <name> --reset` so the next session_start (reason="new") applies it. */
   pendingRoleAfterReset: string | null;
-  /** Cached discovery result for the current cwd; refreshed on session_start and on `/role reload`. */
+  /** Cached discovery result; refreshed on session_start, every `/role` invocation, and `/role reload`. */
   roles: RawRole[];
+  /** Shadowed roles found at lower-precedence scopes; shown in `/role list`. */
+  shadowed: { name: string; source: string; path: string }[];
   /** Cached settings for the current cwd; refreshed on session_start. */
   settings: PiRolesSettings;
   /** Carried across role swaps so the session-name intent survives a role change. */
@@ -59,8 +61,19 @@ export default function (pi: ExtensionAPI): void {
     activeRole: null,
     pendingRoleAfterReset: null,
     roles: [],
+    shadowed: [],
     settings: {},
     intent: undefined,
+  };
+
+  /** Re-read settings + re-discover roles from disk. Centralized so every */
+  /** entry point that needs fresh state ({@link session_start}, every `/role` */
+  /** invocation, `/role reload`) goes through one path. */
+  const refreshFromDisk = (cwd: string): void => {
+    state.settings = loadSettings(cwd);
+    const discovery = discoverRoles(cwd, state.settings.roleScope ?? "both");
+    state.roles = discovery.roles;
+    state.shadowed = discovery.shadowed;
   };
 
   // --------------------------------------------------------------------- flag
@@ -84,9 +97,7 @@ export default function (pi: ExtensionAPI): void {
 
   // --------------------------------------------------------------- session_start
   pi.on("session_start", async (event, ctx) => {
-    state.settings = loadSettings(ctx.cwd);
-    const discovery = discoverRoles(ctx.cwd, state.settings.roleScope ?? "both");
-    state.roles = discovery.roles;
+    refreshFromDisk(ctx.cwd);
 
     const restored = findRestoredState(ctx);
 
@@ -140,6 +151,11 @@ export default function (pi: ExtensionAPI): void {
     description: "Switch session role. /role list | current | reload | <name> [--reset]",
     getArgumentCompletions: (prefix) => roleCompletions(prefix, state.roles),
     handler: async (args, ctx) => {
+      // README guarantees "/role <name> always re-reads from disk". Refresh
+      // before any subcommand so /list shows new files and /<name> picks up
+      // edits without an explicit /role reload.
+      refreshFromDisk(ctx.cwd);
+
       const tokens = args.trim().split(/\s+/).filter(Boolean);
       const sub = tokens[0];
 
@@ -307,9 +323,16 @@ async function handleList(
     .sort((a, b) => a.frontmatter.name.localeCompare(b.frontmatter.name))
     .map((r) => {
       const marker = state.activeRole?.name === r.frontmatter.name ? "* " : "  ";
-      return `${marker}${r.frontmatter.name} (${r.source}) — ${r.frontmatter.description}`;
+      return `${marker}${r.frontmatter.name} [${r.source}] — ${r.frontmatter.description}`;
     });
-  ctx.ui.notify(["Available roles:", ...lines].join("\n"), "info");
+  const shadowed = state.shadowed.map(
+    (s) => `  ${s.name} [${s.source}] (shadowed) — ${s.path}`,
+  );
+  const all =
+    shadowed.length > 0
+      ? ["Available roles:", ...lines, "", "Shadowed (lower-priority duplicates):", ...shadowed]
+      : ["Available roles:", ...lines];
+  ctx.ui.notify(all.join("\n"), "info");
 }
 
 async function handleCurrent(
@@ -330,11 +353,9 @@ async function handleReload(
   ctx: ExtensionCommandContext,
   state: RuntimeState,
 ): Promise<void> {
+  // Disk re-read already happened in the command handler prelude; just
+  // re-apply against the freshly discovered set.
   const previous = state.activeRole?.name ?? pickInitialRoleName(pi, state.settings, state.roles);
-  // Re-discover so an edited or newly-added role file shows up.
-  state.settings = loadSettings(ctx.cwd);
-  const discovery = discoverRoles(ctx.cwd, state.settings.roleScope ?? "both");
-  state.roles = discovery.roles;
   await applyResolved(pi, ctx, state, previous, {
     silent: false,
     preservedIntent: state.intent,

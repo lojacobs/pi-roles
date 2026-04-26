@@ -30,7 +30,7 @@ Then restart pi. The extension is auto-discovered; the `--role` flag and `/role`
 To try without installing:
 
 ```bash
-pi -e git:github.com/<your-user>/pi-roles
+pi -e git:github.com/lojacobs/pi-roles
 ```
 
 ---
@@ -135,11 +135,11 @@ Roles are looked up in this order, **first match wins** for any given name:
 
 | Scope | Path | Marker in `/role list` |
 |---|---|---|
-| project | `<repo>/.pi/roles/<name>.md` | `[project]` |
+| project | `<repo>/.pi/roles/<name>.md` (or any ancestor) | `[project]` |
 | user | `~/.pi/agent/roles/<name>.md` | `[user]` |
 | built-in | bundled with the package | `[built-in]` |
 
-When a project-scope role shadows a user-scope role of the same name, the user-scope entry is shown in `/role list` with a `(shadowed)` marker so you know it exists but won't load.
+When a project-scope role shadows a user-scope role of the same name, the user-scope entry is listed under a separate "Shadowed" heading in `/role list` output so you know it exists but won't load.
 
 The default `roleScope` is `both` (project + user + built-in). Override via settings:
 
@@ -188,7 +188,7 @@ If `defaultRole` points to a missing role, the built-in `role-assistant` is used
 | `/role <name>` | Switch to `<name>`. **Preserves history.** Re-reads the file from disk (no caching). |
 | `/role <name> --reset` | Switch to `<name>` **and** clear history (equivalent to `/new` + apply role). |
 | `/role list` | List discovered roles with scope markers and shadowing info. |
-| `/role current` | Show the currently active role's name, description, model, thinking, tools. |
+| `/role current` | Show the currently active role's name, extends chain, description, and source path. |
 | `/role reload` | Re-read the **currently active** role's file from disk and re-apply. Useful while you're iterating on a prompt. |
 
 ---
@@ -206,7 +206,7 @@ Resolution order: `--role` > `PI_ROLE` > `defaultRole` setting > built-in `role-
 
 ## Session name and footbar
 
-Each session is named `<role-name> — <intent>` where `<intent>` is a ≤10-word summary of your first user message, generated asynchronously the first time you send something. The role-name prefix updates when you `/role` to a different role. The intent stays — your goal usually persists across role swaps in the same session ("as architect I decided X, now plan it").
+Each session is named `<role-name>` (and, once the title-generation phase ships, `<role-name> — <intent>`, where `<intent>` is a short summary of your first user message). The role-name prefix updates when you `/role` to a different role.
 
 The session name is set via Pi's native `pi.setSessionName()` API, so:
 
@@ -215,7 +215,7 @@ The session name is set via Pi's native `pi.setSessionName()` API, so:
 
 The role indicator also appears in Pi's footer (via `ctx.ui.setStatus`), composing cleanly with [`pi-powerline-footer`](https://github.com/nicobailon/pi-powerline-footer) if you have it installed. No extra dependency required.
 
-**Title generation model.** Set `titleModel` in settings to control which model summarizes the intent (defaults to a small/cheap model when one is available, otherwise falls back to the session's current model). The summarization call is fire-and-forget — it never blocks your turn.
+**Title generation model** (planned). The `titleModel` setting is reserved for the future intent-summarization step; it has no effect today. The current release sets the session name to the bare role name and updates the prefix on swap.
 
 ---
 
@@ -305,12 +305,12 @@ Project settings beat global settings, per Pi's standard precedence.
 
 These are decided, not configurable, so the extension behaves predictably:
 
-- **Markdown body always replaces** Pi's default system prompt for the role. No silent merging — most non-coding roles are polluted by the default "expert coding assistant" framing.
+- **Markdown body is appended to Pi's `before_agent_start` system-prompt chain.** This means the role body composes with whatever prompt the upstream chain produced (Pi default + any other extensions), with the role body last and therefore most influential. If you need the role body to fully replace upstream framing, write the body to begin with explicit overriding instructions ("Ignore any previous coding-assistant framing; you are X.").
 - **Role inheritance**: `model`/`thinking` override; `tools` is tri-state (set/empty/absent); markdown body is **prepended**.
 - **Cycle detection in `extends`** is a hard error at load time, not a warning. A circular role is broken; refusing to load it is the only sane behavior.
 - **`/role <name>` always re-reads from disk.** No staleness between switches, ever.
 - **`--reset` is explicit.** The role-assistant prints the exact `--reset` command for you to run manually rather than auto-resetting; resetting is destructive enough to deserve a deliberate keystroke.
-- **Title generation is async fire-and-forget.** It never blocks your turn. On `--reset`, both the history and the intent are cleared and the next message regenerates the title.
+- **Title generation** (planned, not yet implemented). The current release sets the session name to the bare role name; intent-summarization on first user message lands in a follow-up. `--reset` already clears the cached intent so the future implementation drops in cleanly.
 - **Built-in `role-assistant` lives at the lowest discovery priority.** Drop a same-named file in user or project scope to override it.
 - **`/role list` shows shadowed entries** with a `(shadowed)` marker — you can see what *would* load if the higher-priority file didn't exist.
 
