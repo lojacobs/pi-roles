@@ -1,0 +1,70 @@
+{
+  "name": "pi-roles",
+  "version": "0.1.0",
+  "description": "Role-based session configuration for pi coding agent. Launch a session as a named role and hot-swap roles mid-session, with optional pi-intercom and pi-mcp-adapter integration.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "role",
+    "roles",
+    "session",
+    "agent",
+    "system-prompt"
+  ],
+  "homepage": "https://github.com/lojacobs/pi-roles#readme",
+  "bugs": {
+    "url": "https://github.com/lojacobs/pi-roles/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lojacobs/pi-roles.git"
+  },
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "src/",
+    "resources/",
+    "examples/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-agent-core": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-tui": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@mariozechner/pi-coding-agent": { "optional": false },
+    "@mariozechner/pi-agent-core": { "optional": false },
+    "@mariozechner/pi-ai": { "optional": false },
+    "@mariozechner/pi-tui": { "optional": true },
+    "typebox": { "optional": false }
+  },
+  "dependencies": {
+    "yaml": "^2.5.0"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "*",
+    "typebox": "^1.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
