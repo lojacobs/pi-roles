@@ -6,8 +6,8 @@
 **Phase 4 (Main entry + commands) — ✅ complete.** `src/index.ts`, `src/settings.ts`, `test/index.test.ts` (12 tests).
 **Phase 6 (Built-in role-assistant) — ✅ complete.** `resources/roles/role-assistant.md`, `src/role-assistant.ts`, `test/role-assistant.test.ts` (5 tests).
 **Phase 7 (Intercom integration) — ✅ complete.** `src/intercom.ts`, `test/intercom.test.ts` (7 tests). `before_agent_start` in `index.ts` now composes role body + intercom addendum.
-**Phase 8 (Examples + tests) — ✅ complete.** `examples/architect.md`, `examples/orchestrator.md`, `test/examples.test.ts` (3 tests). 82 tests passing total.
-**Phase 5 (title generation) — pending.** Still blocked on pi-ai API verification (see "Things still to verify" section below).
+**Phase 8 (Examples + tests) — ✅ complete.** `examples/architect.md`, `examples/orchestrator.md`, `test/examples.test.ts` (3 tests).
+**Phase 5 (title generation) — ✅ complete.** `src/title.ts`, `test/title.test.ts` (37 tests). `before_agent_start` in `index.ts` fires `generateAndApplyTitle` fire-and-forget on the first prompt of a session; success path mutates `state.intent`, calls `pi.setSessionName`, and re-persists the active-role entry. **125 tests passing total.**
 
 ### Verified-against-pi-coding-agent-0.70.2 corrections (from Phase 3 work)
 
@@ -383,11 +383,18 @@ Tests covered above in Phase 2 + per-phase. Use vitest, no real LLM calls.
 
 ---
 
-## Things still to verify before Phase 5 (title generation)
+## Verified-during-Phase-5 corrections (pi-ai + ExtensionContext)
 
-`@mariozechner/pi-ai` is the LLM client. Need to check the current API for making a completion call from inside an extension — looked at the docs but didn't pin down the exact import. Quick search for `complete` or `streamText` in pi-ai npm page should resolve it. Don't write title.ts without that check.
+These were checked while wiring up title generation. They override anything earlier in the doc.
 
-Also: confirm `pi.appendEntry` is the right persistence mechanism for active-role state versus, say, settings — `appendEntry` writes to the session log, settings would persist across new sessions. We want session-scoped, so `appendEntry` is correct.
+12. **pi-ai exports `complete(model, context, options?)`** from the package root (`@mariozechner/pi-ai`), returning `Promise<AssistantMessage>`. `Context` is `{ systemPrompt?, messages: Message[], tools? }`. There's no `streamText`. We use `complete` (not `completeSimple`) because we don't need thinking-level controls — title generation should be quick on whatever the user already has configured.
+13. **`getModel` is on `ExtensionContext`, exposed as a `model` property — not as a method.** The original BUILD-STATUS hint that referred to `pi.getModel()` was wrong; `getModel: () => Model<any> | undefined` lives on the internal `ExtensionContextActions` interface and is surfaced to extensions as `ctx.model: Model<any> | undefined`. Use `ctx.model`, never `ctx.getModel()`.
+14. **`BeforeAgentStartEvent.prompt` is the raw user prompt text.** No need for a separate first-user-message hook — `before_agent_start` already gives us what we need to summarize. Title generation is fire-and-forget here so the agent loop isn't blocked on a cosmetic step.
+15. **Race tolerance is intentionally lax.** `generateAndApplyTitle` re-checks `state.intent` and `state.activeRole` after the await; if either has changed (e.g. another path set intent, or activeRole was cleared) we drop the result. We do *not* implement a generation-token cancellation scheme — the worst-case stale-intent-after-`--reset` scenario is a single-prompt cosmetic glitch that the next message corrects, and the added complexity isn't worth the rare edge case.
+16. **`titleInFlight` flag prevents duplicate concurrent calls.** It's reset in the orchestrator's `finally` block; if Pi reloads the extension mid-flight, the new module instance starts with `titleInFlight=false` and a clean slate.
+17. **Persistence on title-gen success re-writes the full `ActiveRoleState`** (not just intent). `pi.appendEntry` is append-only, so the latest entry wins on restore — passing only `{ intent }` would leave the rest of the state stale. The title.ts orchestrator builds the full state object from `state.activeRole` plus the freshly-generated intent.
+
+Earlier note: `pi.appendEntry` was already confirmed in Phase 3 as the correct mechanism for session-scoped state (versus `settings.json`'s cross-session persistence). That holds.
 
 ---
 

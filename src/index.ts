@@ -36,6 +36,7 @@ import {
   type ResolvedRole,
 } from "./schemas.ts";
 import { loadSettings } from "./settings.ts";
+import { generateAndApplyTitle } from "./title.ts";
 
 const FLAG_NAME = "role";
 const ENV_VAR = "PI_ROLE";
@@ -54,6 +55,13 @@ interface RuntimeState {
   settings: PiRolesSettings;
   /** Carried across role swaps so the session-name intent survives a role change. */
   intent: string | undefined;
+  /**
+   * True while a title-generation request is in flight. Prevents
+   * `before_agent_start` from spawning a second concurrent summarization
+   * if it fires again before the first resolves. Reset to false in
+   * `generateAndApplyTitle`'s finally block.
+   */
+  titleInFlight: boolean;
 }
 
 export default function (pi: ExtensionAPI): void {
@@ -64,6 +72,7 @@ export default function (pi: ExtensionAPI): void {
     shadowed: [],
     settings: {},
     intent: undefined,
+    titleInFlight: false,
   };
 
   /** Re-read settings + re-discover roles from disk. Centralized so every */
@@ -141,7 +150,31 @@ export default function (pi: ExtensionAPI): void {
   // "Replace the system prompt for this turn"; that is what we do.
   // Subsequent extensions in the chain see our value as their
   // event.systemPrompt and may compose if they choose.
-  pi.on("before_agent_start", async () => composeSystemPrompt(state, pi));
+  //
+  // Side effect — title generation. When this is the first prompt of the
+  // session (no intent persisted yet), kick off an async summarization to
+  // populate the session-name "intent" half. We don't await: the agent
+  // loop should start immediately, and the session name update can race
+  // independently. `generateAndApplyTitle` handles guards (already-set,
+  // already-running, no-model) internally.
+  pi.on("before_agent_start", async (event, ctx) => {
+    if (
+      state.activeRole &&
+      !state.intent &&
+      !state.titleInFlight &&
+      event.prompt &&
+      event.prompt.trim().length > 0
+    ) {
+      void generateAndApplyTitle({
+        prompt: event.prompt,
+        state,
+        pi,
+        ctx,
+        configuredTitleModel: state.settings.titleModel,
+      });
+    }
+    return composeSystemPrompt(state, pi);
+  });
 
   // ---------------------------------------------------------------- /role
   pi.registerCommand("role", {
