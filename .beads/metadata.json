@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "pi_roles",
+  "project_id": "d19563d8-d285-4c2d-8e7a-41d4c48494eb"
+}

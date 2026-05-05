@@ -1,0 +1,9 @@
+src/
+test/
+.claude/
+.github/
+tsup.config.ts
+tsconfig*.json
+*.tsbuildinfo
+phase-effort.md
+BUILD-STATUS.md

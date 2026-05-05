@@ -18,3 +18,8 @@ coverage/
 # Local agent state and planning scratch
 .claude/
 phase-effort.md
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
