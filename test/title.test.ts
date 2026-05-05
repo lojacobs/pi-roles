@@ -300,7 +300,7 @@ describe("generateAndApplyTitle", () => {
 
     expect(state.intent).toBe("Refactor login flow");
     expect(state.titleInFlight).toBe(false);
-    expect(setSessionName).toHaveBeenCalledWith("architect — Refactor login flow");
+    expect(setSessionName).toHaveBeenCalledWith("Refactor login flow - architect");
     expect(appendEntry).toHaveBeenCalledTimes(1);
     expect(appendEntry).toHaveBeenCalledWith(
       ACTIVE_ROLE_ENTRY_TYPE,

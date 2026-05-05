@@ -12,6 +12,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   applyRole,
+  composeFooterStatus,
   composeSessionName,
   effectiveIntercomMode,
   filterToolsForRuntime,
@@ -270,15 +271,24 @@ describe("filterToolsForRuntime", () => {
 });
 
 describe("composeSessionName", () => {
-  it("empty intent → role only", () => {
-    expect(composeSessionName("architect", undefined)).toBe("architect");
-    expect(composeSessionName("architect", "")).toBe("architect");
-    expect(composeSessionName("architect", "   ")).toBe("architect");
+  it("empty/undefined intent → INTENT_PLACEHOLDER - role", () => {
+    expect(composeSessionName(undefined, "architect")).toBe("<intent> - architect");
+    expect(composeSessionName("", "architect")).toBe("<intent> - architect");
+    expect(composeSessionName("   ", "architect")).toBe("<intent> - architect");
   });
-  it("non-empty → 'role — intent'", () => {
-    expect(composeSessionName("architect", "designing schema")).toBe(
-      "architect — designing schema",
+  it("non-empty → '<intent> - <role>'", () => {
+    expect(composeSessionName("designing schema", "architect")).toBe(
+      "designing schema - architect",
     );
+  });
+});
+
+describe("composeFooterStatus", () => {
+  it("non-empty role name", () => {
+    expect(composeFooterStatus("architect")).toBe("role: architect");
+  });
+  it("empty role name", () => {
+    expect(composeFooterStatus("")).toBe("role: ");
   });
 });
 
@@ -304,8 +314,8 @@ describe("applyRole", () => {
     expect(fake.pi.setModel).toHaveBeenCalledTimes(1);
     expect(fake.pi.setThinkingLevel).toHaveBeenCalledWith("high");
     expect(fake.pi.setActiveTools).toHaveBeenCalledWith(["read", "write"]);
-    expect(fake.ctx.ui.setStatus).toHaveBeenCalledWith(STATUS_KEY, "test");
-    expect(fake.pi.setSessionName).toHaveBeenCalledWith("test");
+    expect(fake.ctx.ui.setStatus).toHaveBeenCalledWith(STATUS_KEY, "role: test");
+    expect(fake.pi.setSessionName).toHaveBeenCalledWith("<intent> - test");
     expect(fake.pi.appendEntry).toHaveBeenCalledWith(
       ACTIVE_ROLE_ENTRY_TYPE,
       expect.objectContaining({ name: "test", source: "project" }),
@@ -381,7 +391,7 @@ describe("applyRole", () => {
     await applyRole(makeRole({ name: "architect" }), applyCtxOf(fake), {
       preservedIntent: "wiring schemas",
     });
-    expect(fake.pi.setSessionName).toHaveBeenCalledWith("architect — wiring schemas");
+    expect(fake.pi.setSessionName).toHaveBeenCalledWith("wiring schemas - architect");
     expect(fake.pi.appendEntry).toHaveBeenCalledWith(
       ACTIVE_ROLE_ENTRY_TYPE,
       expect.objectContaining({ intent: "wiring schemas" }),
