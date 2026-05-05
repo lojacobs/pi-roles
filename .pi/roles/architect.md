@@ -102,6 +102,73 @@ bd create --type epic --priority <p> --title "<feature>"
 bd comment <epic-id> "[ARCH→PLANNER] proposal: openspec/changes/<change-id>/ — <one-line summary>"
 ```
 
+The comment **must** include a `## Before snippets` section and an `## Unchanged files` section (see below). The Planner is read-only on source code; it must reconstruct what needs changing by reading entire files. Inlining the exact code blocks saves the Planner ~70% of its token budget.
+
+### 6.1. Before snippets (mandatory)
+
+For every source/test/config file the proposal modifies, paste the **current code** that will change — the exact function, block, or assertion, with its file path and line range. Not the whole file. Not pseudocode. The real code. Format:
+
+```markdown
+### src/apply.ts:composeSessionName (L205-208)
+```ts
+export function composeSessionName(roleName: string, intent: string | undefined): string {
+  const trimmed = (intent ?? "").trim();
+  return trimmed.length > 0 ? `${roleName} — ${trimmed}` : roleName;
+}
+```
+→ Change to: intent-first, hyphen separator, INTENT_PLACEHOLDER sentinel.
+
+### src/apply.ts:footer setStatus (L297-299)
+```ts
+if (ctx.hasUI) {
+  ctx.ui.setStatus(STATUS_KEY, role.name);
+}
+```
+→ Change to: `composeFooterStatus(role.name, options.preservedIntent)`
+```
+
+Each snippet shows: file path, symbol or region, line numbers, the current code, and a one-line "→ Change to" description of what the coder should produce. The Planner copies these into task bodies so a coder sub-agent never has to read the full file.
+
+### 6.2. Unchanged files (mandatory)
+
+List files that look relevant but **do not need modification**, with a one-word reason each. The Planner uses this to tell coders what *not* to read, keeping their context tight.
+
+```markdown
+## Unchanged files (coder should NOT read)
+- src/index.ts — composeSystemPrompt reads pi.getSessionName(), picks up new format automatically
+- src/intercom.ts — intercomPromptAddendum reads session name, no code change
+```
+
+### 6.3. Full example handoff comment
+
+```markdown
+[ARCH→PLANNER] proposal: openspec/changes/fix-session-identity-and-packaging/
+
+Three changes bundled for v0.2.0: (1) flip session-identity format to intent-first, (2) add composeFooterStatus helper, (3) package name unscope + version bump.
+
+## Before snippets
+
+### src/apply.ts:composeSessionName (L205-208)
+[exact current code]
+→ Change to: intent-first, hyphen separator, INTENT_PLACEHOLDER sentinel.
+
+### src/apply.ts:footer setStatus (L297-299)
+[exact current code]
+→ Change to: composeFooterStatus(role.name, options.preservedIntent)
+
+### src/title.ts:generateAndApplyTitle success path (L244-255)
+[exact current code]
+→ Change to: add ctx.ui.setStatus(STATUS_KEY, composeFooterStatus(...)) after pi.setSessionName, guarded by ctx.hasUI.
+
+### test/apply.test.ts:composeSessionName suite (L272-280)
+[exact current code]
+→ Change to: expect intent-first format with INTENT_PLACEHOLDER.
+
+## Unchanged files (coder should NOT read)
+- src/index.ts — reads session name at runtime, no code change
+- src/intercom.ts — reads session name at runtime, no code change
+```
+
 ## 7. Archive after implementation
 
 When the Orchestrator confirms all tasks under the epic are merged:
