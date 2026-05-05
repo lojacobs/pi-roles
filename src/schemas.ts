@@ -341,4 +341,4 @@ export const BUILTIN_ROLE_ASSISTANT_NAME = "role-assistant" as const;
  * ComposeSessionName flips to `<intent> - <role>` format; when intent is empty,
  * this placeholder makes the session name readable instead of just "- role".
  */
-export const INTENT_PLACEHOLDER = "<intent>" as const;
+export const INTENT_PLACEHOLDER = "Intent not defined" as const;

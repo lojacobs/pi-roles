@@ -213,8 +213,8 @@ export function composeSessionName(intent: string | undefined, roleName: string)
  * Compose the footer status string shown in the status bar. Shows the role
  * name prefixed with "role:".
  */
-export function composeFooterStatus(roleName: string): string {
-  return `role: ${roleName}`;
+export function composeFooterStatus(roleName: string, intent: string | undefined): string {
+  return composeSessionName(intent, roleName);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ export async function applyRole(
 
   // 4. Footer status
   if (ctx.hasUI) {
-    ctx.ui.setStatus(STATUS_KEY, composeFooterStatus(role.name));
+    ctx.ui.setStatus(STATUS_KEY, composeFooterStatus(role.name, options.preservedIntent));
   }
 
   // 5. Session name

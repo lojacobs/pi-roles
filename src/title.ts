@@ -251,7 +251,7 @@ export async function generateAndApplyTitle(args: TitleArgs): Promise<void> {
     state.intent = intent;
     pi.setSessionName(composeSessionName(intent, state.activeRole.name));
     if (ctx.hasUI) {
-      ctx.ui.setStatus(STATUS_KEY, composeFooterStatus(state.activeRole.name));
+      ctx.ui.setStatus(STATUS_KEY, composeFooterStatus(state.activeRole.name, intent));
     }
     const persisted: ActiveRoleState = {
       name: state.activeRole.name,

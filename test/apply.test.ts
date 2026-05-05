@@ -272,9 +272,9 @@ describe("filterToolsForRuntime", () => {
 
 describe("composeSessionName", () => {
   it("empty/undefined intent → INTENT_PLACEHOLDER - role", () => {
-    expect(composeSessionName(undefined, "architect")).toBe("<intent> - architect");
-    expect(composeSessionName("", "architect")).toBe("<intent> - architect");
-    expect(composeSessionName("   ", "architect")).toBe("<intent> - architect");
+    expect(composeSessionName(undefined, "architect")).toBe("Intent not defined - architect");
+    expect(composeSessionName("", "architect")).toBe("Intent not defined - architect");
+    expect(composeSessionName("   ", "architect")).toBe("Intent not defined - architect");
   });
   it("non-empty → '<intent> - <role>'", () => {
     expect(composeSessionName("designing schema", "architect")).toBe(
@@ -284,11 +284,13 @@ describe("composeSessionName", () => {
 });
 
 describe("composeFooterStatus", () => {
-  it("non-empty role name", () => {
-    expect(composeFooterStatus("architect")).toBe("role: architect");
+  it("undefined intent → INTENT_PLACEHOLDER - role", () => {
+    expect(composeFooterStatus("architect", undefined)).toBe("Intent not defined - architect");
+    expect(composeFooterStatus("architect", "")).toBe("Intent not defined - architect");
+    expect(composeFooterStatus("architect", "   ")).toBe("Intent not defined - architect");
   });
-  it("empty role name", () => {
-    expect(composeFooterStatus("")).toBe("role: ");
+  it("non-empty intent → '<intent> - <role>'", () => {
+    expect(composeFooterStatus("architect", "designing schema")).toBe("designing schema - architect");
   });
 });
 
@@ -314,8 +316,8 @@ describe("applyRole", () => {
     expect(fake.pi.setModel).toHaveBeenCalledTimes(1);
     expect(fake.pi.setThinkingLevel).toHaveBeenCalledWith("high");
     expect(fake.pi.setActiveTools).toHaveBeenCalledWith(["read", "write"]);
-    expect(fake.ctx.ui.setStatus).toHaveBeenCalledWith(STATUS_KEY, "role: test");
-    expect(fake.pi.setSessionName).toHaveBeenCalledWith("<intent> - test");
+    expect(fake.ctx.ui.setStatus).toHaveBeenCalledWith(STATUS_KEY, "Intent not defined - test");
+    expect(fake.pi.setSessionName).toHaveBeenCalledWith("Intent not defined - test");
     expect(fake.pi.appendEntry).toHaveBeenCalledWith(
       ACTIVE_ROLE_ENTRY_TYPE,
       expect.objectContaining({ name: "test", source: "project" }),
