@@ -65,22 +65,26 @@ Verify: `composeFooterStatus("architect", undefined)` → `"Intent not defined -
    - If the existing fake `ExtensionContext` doesn't have `hasUI` / `ui.setStatus`, extend it minimally.
 3. Update the docstring reference from em-dash to hyphen.
 
-## T4: Package distribution — unscope name + version bump + CHANGELOG
+## T4: CHANGELOG entry for 0.2.0
 
-**Files:** `package.json`, `CHANGELOG.md`
+**Files:** `CHANGELOG.md`
 **Depends on:** —
 
-1. `package.json`: change `"name"` from `"@lojacobs/pi-roles"` to `"pi-roles"`, change `"version"` from `"0.1.0"` to `"0.2.0"`.
-2. `CHANGELOG.md`: add `## [0.2.0] - 2026-05-05` section above the `[Unreleased]` header:
+> **Note:** `package.json` name (`pi-roles`) and version (`0.2.0`) are already committed (commit `81331ee`). The ESM dist structure (`main`, `exports`, `types`, `files: dist/`, `build` scripts, `tsup`) is also already in place. This task only adds the CHANGELOG entry.
+
+1. `CHANGELOG.md`: add `## [0.2.0] - 2026-05-05` section above the `[Unreleased]` header:
    ```
    ### Changed
    - Session identity format flipped from `<role> — <intent>` to `<intent> - <role>` with `INTENT_PLACEHOLDER` ("Intent not defined") when intent is absent.
    - Footer status bar now shows the full composed identity string instead of bare role name.
    - Footer refreshes immediately after title generation (no longer waits for next `before_agent_start`).
-   - npm package name changed from `@lojacobs/pi-roles` to `pi-roles`.
+
+   ### Added
+   - ESM distribution via `dist/` (compiled with `tsup`). `main`, `exports`, and `types` fields added to `package.json`.
+   - `build`, `clean`, and `prepublishOnly` npm scripts.
    ```
-3. Update the bottom links: add `[0.2.0]: https://github.com/lojacobs/pi-roles/compare/v0.1.0...v0.2.0`.
-4. Run `npm run typecheck && npm run test` — all green before handoff.
+2. Update the bottom links: add `[0.2.0]: https://github.com/lojacobs/pi-roles/compare/v0.1.0...v0.2.0`.
+3. Run `npm run typecheck && npm run test` — all green before handoff.
 
 ## Dependency graph
 

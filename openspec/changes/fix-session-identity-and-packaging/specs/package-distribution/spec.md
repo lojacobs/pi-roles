@@ -74,8 +74,8 @@ The package SHALL include a `build` script using `tsup`, a `clean` script, and a
 
 ### Requirement: CHANGELOG entry for 0.2.0
 
-`CHANGELOG.md` SHALL contain a `[0.2.0]` entry documenting the package rename (unscoping), the ESM distribution switch (`src/` → `dist/`), the session identity format change, and the footer fix.
+`CHANGELOG.md` SHALL contain a `[0.2.0]` entry documenting the ESM distribution switch (`src/` → `dist/` with `tsup`), the session identity format change, and the footer fix.
 
 #### Scenario: Changelog documents 0.2.0
 - **WHEN** a user reads `CHANGELOG.md`
-- **THEN** they see a `[0.2.0]` section with entries for the package rename, dist/ switch, identity format change, and footer fix
+- **THEN** they see a `[0.2.0]` section with entries for the ESM dist/ switch, identity format change, and footer fix
