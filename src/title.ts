@@ -15,7 +15,7 @@
  * Why not generate eagerly on `applyRole`? Because we don't have a user
  * message yet at apply time. The first prompt is what reveals intent, and
  * Pi only surfaces it via the BeforeAgentStartEvent. Until that fires, the
- * session name is just `<role>` (intent half omitted by composeSessionName).
+ * session name shows `<intent> - <role>` via INTENT_PLACEHOLDER.
  *
  * Why fire-and-forget rather than blocking? Title generation hits a (cheap)
  * model and adds noticeable latency to the first turn. Blocking would mean
@@ -25,8 +25,9 @@
  * Side effects on success:
  *   1. `state.intent` set to the generated text (preserved across role swaps
  *      via index.ts → apply.ts `preservedIntent` plumbing).
- *   2. `pi.setSessionName(<role> — <intent>)` so pi-intercom session
- *      targeting and the TUI title bar reflect what the user actually wants.
+ *   2. `pi.setSessionName(composeSessionName(intent, roleName))` — yields
+ *      `<intent> - <role>` — so pi-intercom session targeting and the TUI
+ *      title bar reflect what the user actually wants.
  *   3. `pi.appendEntry(ACTIVE_ROLE_ENTRY_TYPE, ...)` so a `/reload` or resume
  *      restores the title without re-summarizing.
  *
@@ -40,9 +41,10 @@
 
 import { complete, type AssistantMessage, type Context, type Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { composeSessionName, findModelInRegistry } from "./apply.ts";
+import { composeFooterStatus, composeSessionName, findModelInRegistry } from "./apply.ts";
 import {
   ACTIVE_ROLE_ENTRY_TYPE,
+  STATUS_KEY,
   type ActiveRoleState,
   type ResolvedRole,
 } from "./schemas.ts";
@@ -89,8 +91,9 @@ const MAX_WORDS = 10;
  *   5. Truncate to MAX_WORDS and re-strip trailing punctuation in case the
  *      truncation cut mid-clause.
  *
- * Returns "" for empty input. Callers must check before persisting — empty
- * intent should leave the session name as just `<role>`.
+ * Returns "" for empty input. Callers must check before persisting — when
+ * intent is empty, composeSessionName uses INTENT_PLACEHOLDER, leaving the
+ * session name as `<intent> - <role>`.
  */
 export function extractTitle(raw: string): string {
   if (!raw) return "";
@@ -211,7 +214,8 @@ export interface TitleArgs {
  *
  * On success, mutates state and writes through to Pi:
  *   - state.intent = <generated>
- *   - pi.setSessionName(`${roleName} — ${intent}`)
+ *   - pi.setSessionName(composeSessionName(intent, roleName)) — results in
+ *     `<intent> - <role>` in the TUI
  *   - pi.appendEntry(ACTIVE_ROLE_ENTRY_TYPE, { ...current, intent })
  *
  * On error, swallows. The next `before_agent_start` will retry because
@@ -246,6 +250,9 @@ export async function generateAndApplyTitle(args: TitleArgs): Promise<void> {
 
     state.intent = intent;
     pi.setSessionName(composeSessionName(intent, state.activeRole.name));
+    if (ctx.hasUI) {
+      ctx.ui.setStatus(STATUS_KEY, composeFooterStatus(state.activeRole.name));
+    }
     const persisted: ActiveRoleState = {
       name: state.activeRole.name,
       source: state.activeRole.source,
