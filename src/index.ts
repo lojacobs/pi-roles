@@ -37,6 +37,7 @@ import {
 } from "./schemas.ts";
 import { loadSettings } from "./settings.ts";
 import { generateAndApplyTitle } from "./title.ts";
+import { debugLog } from "./debug.ts";
 
 const FLAG_NAME = "role";
 const ENV_VAR = "PI_ROLE";
@@ -109,6 +110,7 @@ export default function (pi: ExtensionAPI): void {
     refreshFromDisk(ctx.cwd);
 
     const restored = findRestoredState(ctx);
+    debugLog("index", `session_start reason=${event.reason}`, restored ? { name: restored.name, intent: restored.intent } : undefined);
 
     // Restore precedence:
     //   - On reload/resume, prefer the persisted active-role entry.
@@ -165,6 +167,7 @@ export default function (pi: ExtensionAPI): void {
       event.prompt &&
       event.prompt.trim().length > 0
     ) {
+      debugLog("index", "triggering title generation", { promptPreview: event.prompt.slice(0, 80), model: state.settings.titleModel });
       void generateAndApplyTitle({
         prompt: event.prompt,
         state,
@@ -324,9 +327,10 @@ async function applyResolved(
   try {
     resolved = resolveRole(name, state.roles);
   } catch (err) {
+    const message = err instanceof RoleResolutionError ? err.message : String(err);
+    debugLog("index", `applyResolved fallback: ${message}`);
     // Fall back to built-in assistant if the requested role is missing or
     // broken. Surface the underlying error so the user can fix the file.
-    const message = err instanceof RoleResolutionError ? err.message : String(err);
     if (ctx.hasUI) {
       ctx.ui.notify(`pi-roles: ${message} Falling back to ${BUILTIN_ROLE_ASSISTANT_NAME}.`, "warning");
     }
@@ -351,6 +355,7 @@ async function applyResolved(
 
   state.activeRole = resolved;
   state.intent = result.state.intent;
+  debugLog("index", `applied role=${resolved.name}`, { intent: result.state.intent, warnings: result.warnings });
 
   if (ctx.hasUI && result.warnings.length > 0 && !options.silent) {
     // The notification message already mentions the warning count; surface

@@ -17,6 +17,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { Value } from "typebox/value";
 import { PiRolesSettingsSchema, type PiRolesSettings } from "./schemas.ts";
+import { debugLog } from "./debug.ts";
 
 const NAMESPACE = "pi-roles";
 
@@ -41,6 +42,7 @@ function readNamespace(path: string | null): Partial<PiRolesSettings> {
   try {
     parsed = JSON.parse(readFileSync(path, "utf8"));
   } catch {
+    debugLog("settings", `failed to parse ${path}`);
     // A corrupt settings.json shouldn't take pi-roles down. Pi itself reports
     // its own load error via SettingsManager; we follow suit by silently
     // falling back to defaults rather than throwing on session_start.

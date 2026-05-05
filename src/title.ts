@@ -42,6 +42,7 @@
 import { complete, type AssistantMessage, type Context, type Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { composeFooterStatus, composeSessionName, findModelInRegistry } from "./apply.ts";
+import { debugLog } from "./debug.ts";
 import {
   ACTIVE_ROLE_ENTRY_TYPE,
   STATUS_KEY,
@@ -261,8 +262,8 @@ export async function generateAndApplyTitle(args: TitleArgs): Promise<void> {
       appliedAt: Date.now(),
     };
     pi.appendEntry(ACTIVE_ROLE_ENTRY_TYPE, persisted);
-  } catch {
-    // Best-effort. Swallow — next prompt retries.
+  } catch (err) {
+    debugLog("title", "generateAndApplyTitle failed", err instanceof Error ? err.message : String(err));
   } finally {
     state.titleInFlight = false;
   }

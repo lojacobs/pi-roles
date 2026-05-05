@@ -35,6 +35,7 @@ import {
   type ResolvedRole,
   type ToolsDirective,
 } from "./schemas.ts";
+import { debugLog } from "./debug.ts";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -259,6 +260,7 @@ export async function applyRole(
   if (role.model) {
     const lookup = findModelInRegistry(ctx.modelRegistry, role.model);
     if (!lookup.model) {
+      debugLog("apply", `model not found: ${role.model}`);
       warnings.push(
         `Model "${role.model}" not found in registry. Keeping current model.`,
       );
@@ -270,6 +272,7 @@ export async function applyRole(
       }
       const ok = await pi.setModel(lookup.model);
       if (!ok) {
+        debugLog("apply", `setModel refused: ${lookup.model.provider}/${lookup.model.id}`);
         warnings.push(
           `Model "${lookup.model.provider}/${lookup.model.id}" has no API key configured. Keeping current model.`,
         );

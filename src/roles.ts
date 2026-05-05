@@ -29,6 +29,7 @@ import {
   type RoleSource,
   type ToolsDirective,
 } from "./schemas.ts";
+import { debugLog } from "./debug.ts";
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -206,6 +207,7 @@ export function parseRoleSource(text: string, path: string, source: RoleSource):
     parsed = parseYaml(yamlBlock);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
+    debugLog("roles", `YAML parse error in ${path}`, detail);
     throw new RoleResolutionError(`${path}: invalid YAML in frontmatter — ${detail}`);
   }
 
@@ -295,6 +297,7 @@ export function resolveRole(name: string, all: RawRole[]): ResolvedRole {
 
   const leaf = byName.get(name);
   if (!leaf) {
+    debugLog("roles", `role not found: ${name}`);
     throw new RoleResolutionError(
       `Role "${name}" not found. Run /role list to see available roles.`,
     );
@@ -318,6 +321,7 @@ export function resolveRole(name: string, all: RawRole[]): ResolvedRole {
     if (!parentName) break;
     const parent = byName.get(parentName);
     if (!parent) {
+      debugLog("roles", `extends not found: ${cursor.frontmatter.name} -> ${parentName}`);
       throw new RoleResolutionError(
         `Role "${cursor.frontmatter.name}" extends "${parentName}", but no such role was found.`,
       );
