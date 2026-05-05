@@ -27,6 +27,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import {
   ACTIVE_ROLE_ENTRY_TYPE,
+  INTENT_PLACEHOLDER,
   ROLE_NOTIFICATION_MESSAGE_TYPE,
   STATUS_KEY,
   type ActiveRoleState,
@@ -198,13 +199,22 @@ export function filterToolsForRuntime(
 }
 
 /**
- * Compose a session name from a role name and an optional intent string.
- * "<role> — <intent>" when intent is non-empty; just "<role>" otherwise.
- * The em-dash mirrors what pi-intercom expects for session targeting.
+ * Compose the session name in `<intent> - <role>` format. Uses INTENT_PLACEHOLDER
+ * when intent is empty/undefined so the name stays readable (e.g.
+ * `"<intent> - architect"`) rather than just `"- architect"`.
  */
-export function composeSessionName(roleName: string, intent: string | undefined): string {
+export function composeSessionName(intent: string | undefined, roleName: string): string {
   const trimmed = (intent ?? "").trim();
-  return trimmed.length > 0 ? `${roleName} — ${trimmed}` : roleName;
+  const intentPart = trimmed.length > 0 ? trimmed : INTENT_PLACEHOLDER;
+  return `${intentPart} - ${roleName}`;
+}
+
+/**
+ * Compose the footer status string shown in the status bar. Shows the role
+ * name prefixed with "role:".
+ */
+export function composeFooterStatus(roleName: string): string {
+  return `role: ${roleName}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -296,11 +306,11 @@ export async function applyRole(
 
   // 4. Footer status
   if (ctx.hasUI) {
-    ctx.ui.setStatus(STATUS_KEY, role.name);
+    ctx.ui.setStatus(STATUS_KEY, composeFooterStatus(role.name));
   }
 
   // 5. Session name
-  pi.setSessionName(composeSessionName(role.name, options.preservedIntent));
+  pi.setSessionName(composeSessionName(options.preservedIntent, role.name));
 
   // 6. Persist
   const state: ActiveRoleState = {

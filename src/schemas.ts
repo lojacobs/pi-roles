@@ -335,3 +335,10 @@ export const STATUS_KEY = "pi-roles" as const;
  * when no defaultRole is configured and no --role / PI_ROLE is supplied.
  */
 export const BUILTIN_ROLE_ASSISTANT_NAME = "role-assistant" as const;
+
+/**
+ * Placeholder shown in the session name when intent hasn't been generated yet.
+ * ComposeSessionName flips to `<intent> - <role>` format; when intent is empty,
+ * this placeholder makes the session name readable instead of just "- role".
+ */
+export const INTENT_PLACEHOLDER = "<intent>" as const;

@@ -1,7 +1,7 @@
 /**
  * Phase 5 — session-name intent generation.
  *
- * The session name is composed as `<role> — <intent>`. Role-name handling
+ * The session name is composed as `<intent> - <role>` with hyphen. Role-name handling
  * lives in apply.ts (`composeSessionName`); this module is responsible for
  * the *intent* half — a 5–10 word summary of what the user is trying to
  * accomplish, generated from the first user message of a session.
@@ -245,7 +245,7 @@ export async function generateAndApplyTitle(args: TitleArgs): Promise<void> {
     if (!state.activeRole) return;
 
     state.intent = intent;
-    pi.setSessionName(composeSessionName(state.activeRole.name, intent));
+    pi.setSessionName(composeSessionName(intent, state.activeRole.name));
     const persisted: ActiveRoleState = {
       name: state.activeRole.name,
       source: state.activeRole.source,
