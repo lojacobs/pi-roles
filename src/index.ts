@@ -63,6 +63,12 @@ interface RuntimeState {
    * `generateAndApplyTitle`'s finally block.
    */
   titleInFlight: boolean;
+  /**
+   * True after we've shown the one-time title-generation error hint.
+   * Prevents spamming the user on every prompt when the title model
+   * is misconfigured or lacks credentials.
+   */
+  titleErrorShown: boolean;
 }
 
 export default function (pi: ExtensionAPI): void {
@@ -74,6 +80,7 @@ export default function (pi: ExtensionAPI): void {
     settings: {},
     intent: undefined,
     titleInFlight: false,
+    titleErrorShown: false,
   };
 
   /** Re-read settings + re-discover roles from disk. Centralized so every */
@@ -160,6 +167,13 @@ export default function (pi: ExtensionAPI): void {
   // independently. `generateAndApplyTitle` handles guards (already-set,
   // already-running, no-model) internally.
   pi.on("before_agent_start", async (event, ctx) => {
+    debugLog("index", "before_agent_start fired", {
+      hasActiveRole: !!state.activeRole,
+      hasIntent: !!state.intent,
+      inFlight: state.titleInFlight,
+      promptLen: event?.prompt?.length ?? 0,
+      ctxModelId: (ctx as any)?.model?.id,
+    });
     if (
       state.activeRole &&
       !state.intent &&

@@ -184,6 +184,8 @@ export interface TitleStateRef {
   intent: string | undefined;
   titleInFlight: boolean;
   activeRole: ResolvedRole | null;
+  /** True after we've shown the one-time title-generation error hint. */
+  titleErrorShown?: boolean;
 }
 
 export interface TitleArgs {
@@ -226,21 +228,58 @@ export async function generateAndApplyTitle(args: TitleArgs): Promise<void> {
   const { prompt, state, pi, ctx, configuredTitleModel } = args;
   const completeFn = args.completeFn ?? complete;
 
-  if (state.intent) return;
-  if (state.titleInFlight) return;
-  if (!state.activeRole) return;
+  debugLog("title", "generateAndApplyTitle entered", {
+    hasIntent: !!state.intent,
+    inFlight: state.titleInFlight,
+    hasActiveRole: !!state.activeRole,
+    promptLen: prompt?.length ?? 0,
+    configuredTitleModel,
+    ctxModelId: (ctx as any)?.model?.id,
+  });
+  if (state.intent) { debugLog("title", "guard: intent already set"); return; }
+  if (state.titleInFlight) { debugLog("title", "guard: titleInFlight"); return; }
+  if (!state.activeRole) { debugLog("title", "guard: no activeRole"); return; }
   const trimmed = prompt.trim();
-  if (!trimmed) return;
+  if (!trimmed) { debugLog("title", "guard: empty prompt"); return; }
 
   const model = resolveTitleModel(ctx, configuredTitleModel);
-  if (!model) return;
+  if (!model) { debugLog("title", "guard: no model resolved"); return; }
 
   state.titleInFlight = true;
   try {
+    debugLog("title", "calling complete", {
+      modelId: (model as any)?.id,
+      modelProvider: (model as any)?.provider ?? (model as any)?.api?.provider,
+      configuredTitleModel,
+      usedFallback: !configuredTitleModel || configuredTitleModel.length === 0,
+      promptLen: trimmed.length,
+    });
     const message = await completeFn(model, {
       systemPrompt: TITLE_SYSTEM_PROMPT,
       messages: [{ role: "user", content: trimmed, timestamp: Date.now() }],
     });
+    debugLog("title", "complete returned", {
+      stopReason: (message as any)?.stopReason,
+      errorMessage: (message as any)?.errorMessage,
+      usage: (message as any)?.usage,
+      contentBlockCount: message?.content?.length ?? 0,
+      contentBlockTypes: message?.content?.map((b: any) => b.type),
+      fullMessageKeys: message ? Object.keys(message as any) : [],
+      fullMessage: message,
+    });
+    const stopReason = (message as any)?.stopReason;
+    if (stopReason === "error") {
+      const errMsg = (message as any)?.errorMessage ?? "unknown error";
+      debugLog("title", "complete stopReason=error", { errorMessage: errMsg });
+      if (!state.titleErrorShown && ctx.hasUI) {
+        ctx.ui.notify(
+          `pi-roles: title model failed (${errMsg}). Set settings.titleModel to a model with credentials.`,
+          "warning",
+        );
+        state.titleErrorShown = true;
+      }
+      return;
+    }
     const intent = extractTitleFromMessage(message);
     if (!intent) return;
 
@@ -263,7 +302,24 @@ export async function generateAndApplyTitle(args: TitleArgs): Promise<void> {
     };
     pi.appendEntry(ACTIVE_ROLE_ENTRY_TYPE, persisted);
   } catch (err) {
-    debugLog("title", "generateAndApplyTitle failed", err instanceof Error ? err.message : String(err));
+    const e = err as any;
+    debugLog("title", "generateAndApplyTitle failed", {
+      name: e?.name,
+      message: e?.message ?? String(err),
+      stack: e?.stack,
+      status: e?.status ?? e?.statusCode,
+      code: e?.code,
+      cause: e?.cause ? String(e.cause) : undefined,
+      modelId: (model as any)?.id,
+      modelProvider: (model as any)?.provider ?? (model as any)?.api?.provider,
+    });
+    if (!state.titleErrorShown && ctx.hasUI) {
+      ctx.ui.notify(
+        `pi-roles: title generation failed (${e?.message ?? String(err)}). Set settings.titleModel to a model with credentials.`,
+        "warning",
+      );
+      state.titleErrorShown = true;
+    }
   } finally {
     state.titleInFlight = false;
   }
