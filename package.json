@@ -81,7 +81,8 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run clean && npm run build && npm run typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "publish:token": "export $(grep -v '^#' .env | xargs) && npm publish --access public"
   },
   "engines": {
     "node": ">=20"
