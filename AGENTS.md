@@ -5,6 +5,7 @@ This file is auto-loaded by Pi at session start. It applies to every role (Archi
 ## Repository layout
 
 ```
+MAP.md                                # File index with token budgets — read this first
 ARCHITECTURE.md                       # Cross-cutting concerns (infra, deployment, shared auth)
 openspec/
   specs/<capability>/spec.md          # Canonical, current capability specs
