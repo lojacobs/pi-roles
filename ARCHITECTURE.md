@@ -108,7 +108,7 @@ is fully owned by `roles.ts`; this module only mutates session state.
 | **Model resolution** — parse `provider/id`, scan registry, handle bare-id ambiguity | `parseModelId(raw)`, `findModelInRegistry(registry, raw)` |
 | **Intercom mode** — per-role > global default > `"off"` | `effectiveIntercomMode(role, globalDefault)` |
 | **Tool filtering** — resolve `mcp:*` entries against runtime toolset, add `intercom` when mode ≠ off | `filterToolsForRuntime(directive, ...)` |
-| **Session name** — compose `<role> — <intent>` | `composeSessionName(roleName, intent)` |
+| **Session name** — compose `<intent> - <role>` (with `"Intent not defined"` placeholder when intent is empty) | `composeSessionName(roleName, intent)` |
 | **Full apply** — model → thinking → tools → footer → session name → persist → notify | `applyRole(role, ctx, options)` |
 | **Reset** — wrap `ctx.newSession()` (the `/role <name> --reset` primitive) | `resetSession(ctx)` |
 
@@ -140,7 +140,7 @@ The handler reads and clears the pointer; on cancellation, it's restored to `nul
 ### `src/title.ts` — Session-name intent generation
 
 Fire-and-forget summarization of the first user message into a ≤10-word intent string.
-Session name becomes `<role> — <intent>`.
+Session name becomes `<intent> - <role>`.
 
 | Concern | Detail |
 |---|---|
@@ -150,7 +150,7 @@ Session name becomes `<role> — <intent>`.
 | **Output sanitization** | `extractTitle()` strips quotes, terminal punctuation, newlines; truncates to 10 words |
 | **Concurrency** | `titleInFlight` flag prevents duplicate calls |
 | **Race tolerance** | Re-checks `state.intent` and `state.activeRole` after await; drops stale results |
-| **Side effects on success** | Sets `state.intent`, calls `pi.setSessionName`, calls `pi.appendEntry` for persistence across `/reload` |
+| **Side effects on success** | Sets `state.intent`, calls `pi.setSessionName`, calls `ctx.ui.setStatus` (footer refresh), calls `pi.appendEntry` for persistence across `/reload` |
 
 ### `src/settings.ts` — Settings loader
 
@@ -212,8 +212,8 @@ session_start (reason="startup")
               ├─ pi.setModel(...)
               ├─ pi.setThinkingLevel(...)
               ├─ pi.setActiveTools(...)
-              ├─ ctx.ui.setStatus(STATUS_KEY, "architect")
-              ├─ pi.setSessionName("architect")
+              ├─ ctx.ui.setStatus(STATUS_KEY, "Intent not defined - architect")
+              ├─ pi.setSessionName("Intent not defined - architect")
               ├─ pi.appendEntry(ACTIVE_ROLE_ENTRY_TYPE, state)
               └─ pi.sendMessage(notification)
 ```
@@ -225,7 +225,8 @@ before_agent_start fires
   │
   ├─► If !state.intent && first user prompt:
   │     void generateAndApplyTitle(...)    [fire-and-forget]
-  │       └─ on success: pi.setSessionName("architect — Design auth schema")
+  │       └─ on success: pi.setSessionName("Design auth schema - architect")
+  │                      ctx.ui.setStatus(STATUS_KEY, "Design auth schema - architect")
   │
   └─► composeSystemPrompt(state, pi)
         │
@@ -246,7 +247,7 @@ before_agent_start fires
         │  └─ same applyRole flow as session start, but:
         │      - silent=false (show notification)
         │      - preservedIntent carries over the existing intent string
-        │      - pi.setSessionName("planner — Design auth schema")
+        │      - pi.setSessionName("Design auth schema - planner")
         │
         └─ state.activeRole updated, state.intent preserved
 ```
